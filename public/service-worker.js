@@ -45,50 +45,54 @@ const FILES_TO_CACHE = [
     "/assets/images/37.jpg",
     "/assets/images/38.jpg"
 ];
-
-const CACHE_NAME = 'static-cache-v2';
-const DATA_CACHE_NAME = 'data-cache-v1';
-
-self.addEventListener('install', function (evt) {
+const CACHE_NAME = "static-cache-v2";
+const DATA_CACHE_NAME = "data-cache-v1";
+// install
+self.addEventListener("install", function (evt) {
     evt.waitUntil(
         caches.open(CACHE_NAME).then(cache => {
-            console.log('Your files are successfully ');
+            console.log("Your files were pre-cached successfully!");
             return cache.addAll(FILES_TO_CACHE);
         })
     );
     self.skipWaiting();
 });
-
-self.addEventListener('activate', function (evt) {
-    evt.WaitUntil(
+// activate
+self.addEventListener("activate", function (evt) {
+    evt.waitUntil(
         caches.keys().then(keyList => {
             return Promise.all(
                 keyList.map(key => {
                     if (key !== CACHE_NAME && key !== DATA_CACHE_NAME) {
-                        console.log('Removing old cache data', key);
+                        console.log("Removing old cache data", key);
                         return caches.delete(key);
                     }
                 })
-            )
+            );
         })
-    )
-})
-
-self.addEventListener('fetch', function (evt) {
-    if (evt.request.url.includes('/api/')) {
-        console.log('[Service Work] Fetch (data)', evt.request.url);
+    );
+    self.clients.claim();
+});
+// fetch - Note that this represents a caching strategy 
+// for data and static assets
+self.addEventListener("fetch", function (evt) {
+    if (evt.request.url.includes("/api/")) {
         evt.respondWith(
             caches.open(DATA_CACHE_NAME).then(cache => {
-                return fetch(evt.request).then(response => {
-                    if (response.status === 200) {
-                        cache.put(evt.request.url, response.clone());
-                    }
-                    return response;
-                })
+                return fetch(evt.request)
+                    .then(response => {
+                        // If the response was good, clone it and store it in the cache.
+                        if (response.status === 200) {
+                            cache.put(evt.request.url, response.clone());
+                        }
+                        return response;
+                    })
                     .catch(err => {
+                        // Network request failed, try to get it from the cache.
+                        // Offline First Experience for Users
                         return cache.match(evt.request);
                     });
-            })
+            }).catch(err => console.log(err))
         );
         return;
     }
@@ -100,5 +104,3 @@ self.addEventListener('fetch', function (evt) {
         })
     );
 });
-
-console.log("Hello from your service worker!");
